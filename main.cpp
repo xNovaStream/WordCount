@@ -36,6 +36,66 @@ static map <Options, string> OptName =
     { Options::BYTES, "Bytes" }
 };
 
+class OptionsParser
+{
+private:
+    vector<string> filenames;
+    vector<Options> options;
+    static string ArgParse(string arg)
+    {
+        while (arg[0] == '-')
+        {
+            arg.erase(0, 1);
+        }
+        return arg;
+    }
+
+    void AddDefaultOpt()
+    {
+        options.push_back(Options::LINES);
+        options.push_back(Options::WORDS);
+        options.push_back(Options::BYTES);
+    }
+
+    void OptionParse(char* argv[], int& indargv)
+    {
+        if (argv[indargv][0] != '-')
+        {
+            filenames.push_back(static_cast<string>(argv[indargv]));
+        }
+        else if (argv[indargv][1] == '-')
+        {
+            string arg = ArgParse(argv[indargv]);
+            options.push_back(LongOpt[arg]);
+        }
+        else
+        {
+            string args = ArgParse(argv[indargv]);
+            for (char arg : args)
+                options.push_back(ShortOpt[arg]);
+        }
+    }
+public:
+    OptionsParser(const int& argc, char* argv[])
+    {
+        int indargv = 1;
+        for (;indargv < argc;indargv++)
+            OptionParse(argv, indargv);
+        if (options.empty())
+            AddDefaultOpt();
+    }
+
+    vector<Options> GetOptions()
+    {
+        return options;
+    }
+
+    vector<string> GetFilenames()
+    {
+        return filenames;
+    }
+};
+
 void WriteFileData(const string& filename, const map<Options, int>& filedata)
 {
     cout << endl << filename << endl;
@@ -43,44 +103,6 @@ void WriteFileData(const string& filename, const map<Options, int>& filedata)
     {
         cout << OptName[pair_option_count.first] << ": " << pair_option_count.second << endl;
     }
-}
-
-string ArgParse(string arg)
-{
-    while (arg[0] == '-')
-    {
-        arg.erase(0, 1);
-    }
-    return arg;
-}
-
-void AddDefaultOpt(vector<Options> options)
-{
-    options.push_back(Options::LINES);
-    options.push_back(Options::WORDS);
-    options.push_back(Options::BYTES);
-}
-
-bool TryOptionParse(const string& argcmd, vector<Options>& options)
-{
-    if (argcmd == "-" || argcmd == "--" || argcmd[0] != '-')
-    {
-        if (options.empty())
-            AddDefaultOpt(options);
-        return false;
-    }
-    else if (argcmd[1] == '-')
-    {
-        string arg = ArgParse(argcmd);
-        options.push_back(LongOpt[arg]);
-    }
-    else
-    {
-        string args = ArgParse(argcmd);
-        for (char arg : args)
-            options.push_back(ShortOpt[arg]);
-    }
-    return true;
 }
 
 long TextCounter(Options option, const string& filename)
@@ -148,25 +170,13 @@ long CounterChooser(const string& filename, Options option)
 
 int main(int argc, char* argv[])
 {
-    vector<Options> options;
-    int argvind = 1;
-    while (argvind < argc && TryOptionParse(argv[argvind], options))
-        argvind++;
-
-    if (argvind == argc)
+    OptionsParser optionsParser = OptionsParser(argc, argv);
+    for (const string& filename : optionsParser.GetFilenames())
     {
-        cout << "Program requires filename." << std::endl;
-    }
-    else
-    {
-        for (; argvind < argc; argvind++)
-        {
-            string filename = argv[argvind];
-            map<Options, int> filedata;
-            for (Options option : options)
-                filedata[option] = CounterChooser(filename, option);
+        map<Options, int> filedata;
+        for (Options option : optionsParser.GetOptions())
+            filedata[option] = CounterChooser(filename, option);
 
-            WriteFileData(filename, filedata);
-        }
+        WriteFileData(filename, filedata);
     }
 }
