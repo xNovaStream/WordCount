@@ -146,7 +146,7 @@ long TextCounter(Options option, const string& filename, const string& modifier)
                 }
                 break;
             case Options::CHARS:
-                if (isalpha(sim))
+                if (isprint(sim))
                     count++;
                 break;
             case Options::SUBSTRING:
