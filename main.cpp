@@ -209,6 +209,8 @@ void WriteFailFileOpened(const string& filename)
 
 int main(int argc, char* argv[])
 {
+    setlocale(LC_ALL, "Russian");
+
     OptionsParser optionsParser = OptionsParser(argc, argv);
     for (const string& filename : optionsParser.GetFilenames())
     {
