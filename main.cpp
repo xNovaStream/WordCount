@@ -2,6 +2,7 @@
 #include <vector>
 #include <fstream>
 #include <map>
+#include <filesystem>
 
 using namespace std;
 
@@ -110,7 +111,7 @@ public:
     }
 };
 
-void WriteFileData(const string& filename, const map<Options, int>& filedata)
+void WriteFileData(const string& filename, const map<Options, unsigned long long>& filedata)
 {
     cout << endl << filename << endl;
     for (auto pair_option_count : filedata)
@@ -119,12 +120,11 @@ void WriteFileData(const string& filename, const map<Options, int>& filedata)
     }
 }
 
-long TextCounter(Options option, const string& filename, const string& modifier)
+unsigned long long TextCounter(Options option, ifstream& fin, const string& modifier)
 {
-    long count = 0;
+    unsigned long long count = 0;
     char sim;
     string substring;
-    ifstream fin(filename);
     while (!(fin.eof()))
     {
         sim = static_cast<char>(fin.get());
@@ -169,25 +169,17 @@ long TextCounter(Options option, const string& filename, const string& modifier)
                 throw invalid_argument("Using option is not for text");
         }
     }
-    fin.close();
+    fin.clear();
+    fin.seekg(0);
     return count;
 }
 
-long BinCounter(const string& filename)
+unsigned long long BinCounter(const string& filename)
 {
-    long count = 0;
-    ifstream fin(filename, ios::binary);
-    fin.get();
-    while (!(fin.eof()))
-    {
-        fin.get();
-        count++;
-    }
-    fin.close();
-    return count;
+    return filesystem::file_size(filename);
 }
 
-long CounterChooser(Options option, const string& filename, const string& modifier)
+unsigned long long CounterChooser(Options option, const string& modifier, const string& filename, ifstream& fin)
 {
     switch (option)
     {
@@ -195,7 +187,7 @@ long CounterChooser(Options option, const string& filename, const string& modifi
     case Options::CHARS:
     case Options::WORDS:
     case Options::SUBSTRING:
-        return TextCounter(option, filename, modifier);
+        return TextCounter(option, fin, modifier);
     case Options::BYTES:
         return BinCounter(filename);
     }
@@ -209,18 +201,32 @@ string GetModifier(const map<Options, string>& modifiers, Options option)
         return "";
 }
 
+void WriteFailFileOpened(const string& filename)
+{
+    cout << endl << filename << endl;
+    cout << "File can not be opened" << endl;
+}
+
 int main(int argc, char* argv[])
 {
     OptionsParser optionsParser = OptionsParser(argc, argv);
     for (const string& filename : optionsParser.GetFilenames())
     {
-        map<Options, int> filedata;
-        for (Options option : optionsParser.GetOptions())
+        ifstream fin(filename);
+        if (fin.fail())
         {
-            string modifier = GetModifier(optionsParser.GetModifiers(), option);
-            filedata[option] = CounterChooser(option, filename, modifier);
+            WriteFailFileOpened(filename);
         }
+        else
+        {
+            map<Options, unsigned long long> filedata;
+            for (Options option: optionsParser.GetOptions()) {
+                string modifier = GetModifier(optionsParser.GetModifiers(), option);
+                filedata[option] = CounterChooser(option, modifier, filename, fin);
+            }
 
-        WriteFileData(filename, filedata);
+            WriteFileData(filename, filedata);
+        }
+        fin.close();
     }
 }
