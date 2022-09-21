@@ -2,7 +2,6 @@
 #include <vector>
 #include <fstream>
 #include <map>
-#include <algorithm>
 
 using namespace std;
 
@@ -10,6 +9,7 @@ enum class Options
 {
     LINES,
     WORDS,
+    SUBSTRING,
     CHARS,
     BYTES
 };
@@ -25,7 +25,8 @@ static map <string, Options> LongOpt = {
     { "lines", Options::LINES },
     { "words", Options::WORDS },
     { "chars", Options::CHARS },
-    { "bytes", Options::BYTES }
+    { "bytes", Options::BYTES },
+    { "substring", Options::SUBSTRING}
 };
 
 static map <Options, string> OptName =
@@ -33,7 +34,8 @@ static map <Options, string> OptName =
     { Options::LINES, "Lines" },
     { Options::WORDS, "Words" },
     { Options::CHARS, "Chars" },
-    { Options::BYTES, "Bytes" }
+    { Options::BYTES, "Bytes" },
+    { Options::SUBSTRING, "Substring" }
 };
 
 class OptionsParser
@@ -41,6 +43,7 @@ class OptionsParser
 private:
     vector<string> filenames;
     vector<Options> options;
+    map<Options, string> modifiers;
     static string ArgParse(string arg)
     {
         while (arg[0] == '-')
@@ -66,6 +69,12 @@ private:
         else if (argv[indargv][1] == '-')
         {
             string arg = ArgParse(argv[indargv]);
+            if (arg.find('=') != string::npos)
+            {
+                string modifier = arg.substr(arg.find('=') + 1);
+                arg = arg.substr(0, arg.find('='));
+                modifiers[LongOpt[arg]] = modifier;
+            }
             options.push_back(LongOpt[arg]);
         }
         else
@@ -94,6 +103,11 @@ public:
     {
         return filenames;
     }
+
+    map<Options, string> GetModifiers()
+    {
+        return modifiers;
+    }
 };
 
 void WriteFileData(const string& filename, const map<Options, int>& filedata)
@@ -105,11 +119,11 @@ void WriteFileData(const string& filename, const map<Options, int>& filedata)
     }
 }
 
-long TextCounter(Options option, const string& filename)
+long TextCounter(Options option, const string& filename, const string& modifier)
 {
     long count = 0;
     char sim;
-    string word;
+    string substring;
     ifstream fin(filename);
     while (!(fin.eof()))
     {
@@ -123,18 +137,36 @@ long TextCounter(Options option, const string& filename)
             case Options::WORDS:
                 if (sim == ' ' || sim == '\n' || sim == '\r' || sim == '\t' || sim == EOF)
                 {
-                    if (!word.empty())
+                    if (!substring.empty())
                         count++;
-                    word = "";
+                    substring = "";
                 } else
                 {
-                    word += sim;
+                    substring += sim;
                 }
                 break;
             case Options::CHARS:
                 if (isalpha(sim))
                     count++;
                 break;
+            case Options::SUBSTRING:
+                if (modifier.empty())
+                {
+                    throw invalid_argument("Modifier for --substring can not be empty");
+                }
+                else
+                {
+                    if (substring.length() == modifier.length())
+                    {
+                        if (substring == modifier)
+                            count++;
+                        substring = substring.erase(0, 1);
+                    }
+                    substring += sim;
+                }
+                break;
+            default:
+                throw invalid_argument("Using option is not for text");
         }
     }
     fin.close();
@@ -155,17 +187,26 @@ long BinCounter(const string& filename)
     return count;
 }
 
-long CounterChooser(const string& filename, Options option)
+long CounterChooser(Options option, const string& filename, const string& modifier)
 {
     switch (option)
     {
     case Options::LINES:
     case Options::CHARS:
     case Options::WORDS:
-        return TextCounter(option, filename);
+    case Options::SUBSTRING:
+        return TextCounter(option, filename, modifier);
     case Options::BYTES:
         return BinCounter(filename);
     }
+}
+
+string GetModifier(const map<Options, string>& modifiers, Options option)
+{
+    if (modifiers.count(option))
+        return modifiers.at(option);
+    else
+        return "";
 }
 
 int main(int argc, char* argv[])
@@ -175,7 +216,10 @@ int main(int argc, char* argv[])
     {
         map<Options, int> filedata;
         for (Options option : optionsParser.GetOptions())
-            filedata[option] = CounterChooser(filename, option);
+        {
+            string modifier = GetModifier(optionsParser.GetModifiers(), option);
+            filedata[option] = CounterChooser(option, filename, modifier);
+        }
 
         WriteFileData(filename, filedata);
     }
