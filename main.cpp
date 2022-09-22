@@ -122,7 +122,7 @@ void WriteFileData(const string& filename, const map<Options, unsigned long long
 
 void SetStreamDefault(ifstream& fin)
 {
-    fin.close();
+    fin.clear();
     fin.seekg(0);
 }
 
