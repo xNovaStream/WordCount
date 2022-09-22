@@ -27,7 +27,7 @@ static map <string, Options> LongOpt = {
     { "words", Options::WORDS },
     { "chars", Options::CHARS },
     { "bytes", Options::BYTES },
-    { "substring", Options::SUBSTRING}
+    { "substring", Options::SUBSTRING }
 };
 
 static map <Options, string> OptName =
@@ -45,7 +45,7 @@ private:
     vector<string> filenames;
     vector<Options> options;
     map<Options, string> modifiers;
-    static string ArgParse(string arg)
+    static string PrefixDelete(string arg)
     {
         while (arg[0] == '-')
         {
@@ -69,7 +69,7 @@ private:
         }
         else if (argv[indargv][1] == '-')
         {
-            string arg = ArgParse(argv[indargv]);
+            string arg = PrefixDelete(argv[indargv]);
             if (arg.find('=') != string::npos)
             {
                 string modifier = arg.substr(arg.find('=') + 1);
@@ -80,7 +80,7 @@ private:
         }
         else
         {
-            string args = ArgParse(argv[indargv]);
+            string args = PrefixDelete(argv[indargv]);
             for (char arg : args)
                 options.push_back(ShortOpt[arg]);
         }
@@ -120,7 +120,63 @@ void WriteFileData(const string& filename, const map<Options, unsigned long long
     }
 }
 
-unsigned long long TextCounter(Options option, ifstream& fin, const string& modifier)
+void SetStreamDefault(ifstream& fin)
+{
+    fin.close();
+    fin.seekg(0);
+}
+
+unsigned long long LinesCount(ifstream& fin)
+{
+    unsigned long long count = 0;
+    char sim;
+    while (!(fin.eof()))
+    {
+        sim = static_cast<char>(fin.get());
+        if (sim == '\n' || sim == EOF)
+            count++;
+    }
+    SetStreamDefault(fin);
+    return count;
+}
+
+unsigned long long WordsCount(ifstream& fin)
+{
+    unsigned long long count = 0;
+    char sim;
+    bool isempty = false;
+    while (!fin.eof())
+    {
+        sim = static_cast<char>(fin.get());
+        if (sim == ' ' || sim == '\n' || sim == '\r' || sim == '\t' || sim == EOF)
+        {
+            if(isempty)
+                count++;
+            isempty = false;
+        } else
+        {
+            isempty = true;
+        }
+    }
+    SetStreamDefault(fin);
+    return count;
+}
+
+unsigned long long CharsCount(ifstream& fin)
+{
+    unsigned long long count = 0;
+    char sim;
+    while (!(fin.eof()))
+    {
+        sim = static_cast<char>(fin.get());
+        if (isprint(sim))
+            count++;
+    }
+    SetStreamDefault(fin);
+    return count;
+}
+
+unsigned long long SubstringCount(ifstream& fin, const string& modifier)
 {
     unsigned long long count = 0;
     char sim;
@@ -128,68 +184,44 @@ unsigned long long TextCounter(Options option, ifstream& fin, const string& modi
     while (!(fin.eof()))
     {
         sim = static_cast<char>(fin.get());
-        switch (option)
+        if (modifier.empty())
         {
-            case Options::LINES:
-                if (sim == '\n' || sim == EOF)
+            throw invalid_argument("Modifier for --substring can not be empty");
+        }
+        else
+        {
+            if (substring.length() == modifier.length())
+            {
+                if (substring == modifier)
                     count++;
-                break;
-            case Options::WORDS:
-                if (sim == ' ' || sim == '\n' || sim == '\r' || sim == '\t' || sim == EOF)
-                {
-                    if (!substring.empty())
-                        count++;
-                    substring = "";
-                } else
-                {
-                    substring += sim;
-                }
-                break;
-            case Options::CHARS:
-                if (isprint(sim))
-                    count++;
-                break;
-            case Options::SUBSTRING:
-                if (modifier.empty())
-                {
-                    throw invalid_argument("Modifier for --substring can not be empty");
-                }
-                else
-                {
-                    if (substring.length() == modifier.length())
-                    {
-                        if (substring == modifier)
-                            count++;
-                        substring = substring.erase(0, 1);
-                    }
-                    substring += sim;
-                }
-                break;
-            default:
-                throw invalid_argument("Using option is not for text");
+                substring = substring.erase(0, 1);
+            }
+            substring += sim;
         }
     }
-    fin.clear();
-    fin.seekg(0);
+    SetStreamDefault(fin);
     return count;
 }
 
-unsigned long long BinCounter(const string& filename)
+unsigned long long BytesCount(const string& filename)
 {
     return filesystem::file_size(filename);
 }
 
-unsigned long long CounterChooser(Options option, const string& modifier, const string& filename, ifstream& fin)
+unsigned long long ChooseCounter(Options option, const string& modifier, const string& filename, ifstream& fin)
 {
     switch (option)
     {
-    case Options::LINES:
-    case Options::CHARS:
-    case Options::WORDS:
-    case Options::SUBSTRING:
-        return TextCounter(option, fin, modifier);
-    case Options::BYTES:
-        return BinCounter(filename);
+        case Options::LINES:
+            return LinesCount(fin);
+        case Options::WORDS:
+            return WordsCount(fin);
+        case Options::SUBSTRING:
+            return SubstringCount(fin, modifier);
+        case Options::CHARS:
+            return CharsCount(fin);
+        case Options::BYTES:
+            return BytesCount(filename);
     }
 }
 
@@ -224,7 +256,7 @@ int main(int argc, char* argv[])
             map<Options, unsigned long long> filedata;
             for (Options option: optionsParser.GetOptions()) {
                 string modifier = GetModifier(optionsParser.GetModifiers(), option);
-                filedata[option] = CounterChooser(option, modifier, filename, fin);
+                filedata[option] = ChooseCounter(option, modifier, filename, fin);
             }
 
             WriteFileData(filename, filedata);
