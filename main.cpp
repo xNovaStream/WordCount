@@ -15,19 +15,21 @@ enum class Options
     BYTES
 };
 
-static map <char, Options> ShortOpt = {
+static map <char, Options> ShortOpt =
+{
     { 'l', Options::LINES },
     { 'w', Options::WORDS },
     { 'm', Options::CHARS },
     { 'c', Options::BYTES }
 };
 
-static map <string, Options> LongOpt = {
-    { "lines", Options::LINES },
-    { "words", Options::WORDS },
-    { "chars", Options::CHARS },
-    { "bytes", Options::BYTES },
-    { "substring", Options::SUBSTRING }
+static map <string, Options> LongOpt =
+{
+    { "--lines", Options::LINES },
+    { "--words", Options::WORDS },
+    { "--chars", Options::CHARS },
+    { "--bytes", Options::BYTES },
+    { "--substring", Options::SUBSTRING }
 };
 
 static map <Options, string> OptName =
@@ -45,14 +47,6 @@ private:
     vector<string> filenames;
     vector<Options> options;
     map<Options, string> modifiers;
-    static string PrefixDelete(string arg)
-    {
-        while (arg[0] == '-')
-        {
-            arg.erase(0, 1);
-        }
-        return arg;
-    }
 
     void AddDefaultOpt()
     {
@@ -67,9 +61,9 @@ private:
         {
             filenames.push_back(static_cast<string>(argv[indargv]));
         }
-        else if (argv[indargv][1] == '-')
+        else if (static_cast<string>(argv[indargv]).length() > 1 && argv[indargv][1] == '-')
         {
-            string arg = PrefixDelete(argv[indargv]);
+            string arg = argv[indargv];
             if (arg.find('=') != string::npos)
             {
                 string modifier = arg.substr(arg.find('=') + 1);
@@ -80,7 +74,7 @@ private:
         }
         else
         {
-            string args = PrefixDelete(argv[indargv]);
+            string args = static_cast<string>(argv[indargv]).erase(0, 1);
             for (char arg : args)
                 options.push_back(ShortOpt[arg]);
         }
@@ -88,24 +82,23 @@ private:
 public:
     OptionsParser(const int& argc, char* argv[])
     {
-        int indargv = 1;
-        for (;indargv < argc;indargv++)
+        for (int indargv = 1; indargv < argc; indargv++)
             OptionParse(argv, indargv);
         if (options.empty())
             AddDefaultOpt();
     }
 
-    vector<Options> GetOptions()
+    const vector<Options>& GetOptions()
     {
         return options;
     }
 
-    vector<string> GetFilenames()
+    const vector<string>& GetFilenames()
     {
         return filenames;
     }
 
-    map<Options, string> GetModifiers()
+    const map<Options, string>& GetModifiers()
     {
         return modifiers;
     }
@@ -148,7 +141,7 @@ unsigned long long WordsCount(ifstream& fin)
     while (!fin.eof())
     {
         sim = static_cast<char>(fin.get());
-        if (sim == ' ' || sim == '\n' || sim == '\r' || sim == '\t' || sim == EOF)
+        if (isspace(sim) || sim == EOF)
         {
             if(isempty)
                 count++;
