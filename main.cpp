@@ -41,6 +41,21 @@ static map <Options, string> OptName =
     { Options::SUBSTRING, "Substring" }
 };
 
+class InvalidModifier: public exception
+{
+private:
+    string message_error;
+public:
+    explicit InvalidModifier(const string& message_error)
+        : message_error(message_error)
+    {
+    }
+    const string& what()
+    {
+        return message_error;
+    }
+};
+
 class OptionsParser
 {
 private:
@@ -179,7 +194,7 @@ unsigned long long SubstringCount(ifstream& fin, const string& modifier)
         sim = static_cast<char>(fin.get());
         if (modifier.empty())
         {
-            throw invalid_argument("Modifier for --substring can not be empty");
+            throw InvalidModifier("Modifier for --substring can not be empty");
         }
         else
         {
@@ -210,7 +225,15 @@ unsigned long long ChooseCounter(Options option, const string& modifier, const s
         case Options::WORDS:
             return WordsCount(fin);
         case Options::SUBSTRING:
-            return SubstringCount(fin, modifier);
+            try
+            {
+                return SubstringCount(fin, modifier);
+            }
+            catch (InvalidModifier& error)
+            {
+                cout << error.what() << endl;
+                exit(0);
+            }
         case Options::CHARS:
             return CharsCount(fin);
         case Options::BYTES:
